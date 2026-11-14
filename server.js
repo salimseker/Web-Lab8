@@ -18,6 +18,13 @@ const ROBOTS_TXT = [
   'Allow: /',
 ].join('\n');
 
+const COURSES = Object.freeze([
+  Object.freeze({ id: 1, title: 'Foundations of HTML and CSS', credits: 5 }),
+  Object.freeze({ id: 2, title: 'JavaScript in the Browser', credits: 6 }),
+  Object.freeze({ id: 3, title: 'Back-end Development with Node.js', credits: 6 }),
+  Object.freeze({ id: 4, title: 'Web Accessibility and Usability', credits: 4 }),
+]);
+
 const app = express();
 
 // ---------------------------------------------------------------------------
@@ -33,6 +40,21 @@ app.get('/robots.txt', (req, res) => {
 
 app.get('/old-page', (req, res) => {
   res.redirect('/hello');
+});
+
+// ---------------------------------------------------------------------------
+// JSON API routes
+// ---------------------------------------------------------------------------
+app.get('/api/courses', (req, res) => {
+  res.json(COURSES);
+});
+
+app.get('/api/status', (req, res) => {
+  res.json({
+    status: 'ok',
+    nodeVersion: process.version,
+    uptimeSeconds: Math.floor(process.uptime()),
+  });
 });
 
 app.listen(PORT, () => {
