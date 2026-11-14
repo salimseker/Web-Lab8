@@ -1,0 +1,25 @@
+{
+  "name": "assignment-8",
+  "version": "1.0.0",
+  "description": "Small Node.js + Express 5 information server for a made-up study programme",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/salimseker/Web-Lab8.git"
+  },
+  "keywords": [],
+  "author": "Salim Seker",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/salimseker/Web-Lab8/issues"
+  },
+  "homepage": "https://github.com/salimseker/Web-Lab8#readme",
+  "engines": {
+    "node": ">=20.11"
+  }
+}
