@@ -25,7 +25,26 @@ const COURSES = Object.freeze([
   Object.freeze({ id: 4, title: 'Web Accessibility and Usability', credits: 4 }),
 ]);
 
+// The only mutable state in the app: a number we own, never a shared object.
+let requestsServed = 0;
+
 const app = express();
+
+// ---------------------------------------------------------------------------
+// Middleware (registered before every route so each request passes through)
+// ---------------------------------------------------------------------------
+const requestLogger = (req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  next();
+};
+
+const requestCounter = (req, res, next) => {
+  requestsServed += 1;
+  next();
+};
+
+app.use(requestLogger);
+app.use(requestCounter);
 
 // ---------------------------------------------------------------------------
 // Text and redirect routes
@@ -70,6 +89,10 @@ app.post('/api/subscribe', (req, res) => {
 
 app.get('/api/admin', (req, res) => {
   res.status(403).json({ error: 'Forbidden' });
+});
+
+app.get('/api/stats', (req, res) => {
+  res.json({ requestsServed });
 });
 
 app.listen(PORT, () => {
