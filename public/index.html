@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Northwind Web Engineering Programme</title>
+</head>
+<body>
+  <header>
+    <h1>Northwind Web Engineering Programme</h1>
+    <p class="tagline">A two-year, hands-on study programme for future web developers.</p>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h2>About the programme</h2>
+      <p>
+        The Northwind Web Engineering Programme teaches how the web really works,
+        from HTML and CSS in the browser all the way to servers written in Node.js.
+        Students build a real project every term and present it to a small panel of
+        industry mentors.
+      </p>
+      <p>
+        This page is served by the programme's own Express server. Use the buttons
+        below to call each API route and see the exact status code and body it returns.
+      </p>
+    </section>
+
+    <section class="api">
+      <h2>Try the API</h2>
+      <div class="buttons">
+        <button type="button" data-method="GET" data-url="/api/courses">GET /api/courses</button>
+        <button type="button" data-method="GET" data-url="/api/status">GET /api/status</button>
+        <button type="button" data-method="GET" data-url="/api/headers">GET /api/headers</button>
+        <button type="button" data-method="POST" data-url="/api/subscribe">POST /api/subscribe</button>
+        <button type="button" data-method="GET" data-url="/api/admin">GET /api/admin</button>
+        <button type="button" data-method="GET" data-url="/api/stats">GET /api/stats</button>
+        <button type="button" data-method="GET" data-url="/api/does-not-exist">GET /api/does-not-exist</button>
+      </div>
+
+      <h3>Response</h3>
+      <p id="status" class="status">Click a button to send a request.</p>
+      <pre id="output" class="output"></pre>
+    </section>
+  </main>
+
+  <footer>
+    <p>Made by Salim for CMP309 Web Programming.</p>
+  </footer>
+</body>
+</html>

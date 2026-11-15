@@ -1,3 +1,4 @@
+import path from 'node:path';
 import express from 'express';
 
 // ---------------------------------------------------------------------------
@@ -5,6 +6,10 @@ import express from 'express';
 // ---------------------------------------------------------------------------
 const DEFAULT_PORT = 3000;
 const PORT = Number(process.env.PORT) || DEFAULT_PORT;
+
+// Absolute path built from this file's location (not the current working
+// directory), so the server finds public/ no matter where it is started from.
+const PUBLIC_DIR = path.join(import.meta.dirname, 'public');
 
 // ---------------------------------------------------------------------------
 // Hard-coded data
@@ -45,6 +50,9 @@ const requestCounter = (req, res, next) => {
 
 app.use(requestLogger);
 app.use(requestCounter);
+
+// Static files: GET / serves public/index.html, plus styles.css and app.js.
+app.use(express.static(PUBLIC_DIR));
 
 // ---------------------------------------------------------------------------
 // Text and redirect routes
