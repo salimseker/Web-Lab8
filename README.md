@@ -105,3 +105,169 @@ missing. Opening the page once in a browser therefore already adds 3–4 to the 
 **Immutability:** the course data is frozen with `Object.freeze`, and the middleware never adds
 properties to `req` or `res` (objects created by Express, not by me). The only value that changes
 is `requestsServed`, a plain number that belongs to this module.
+
+## Testing evidence (`curl --include`)
+
+The server was started with `npm start` (port 3000) and every request below was sent from a
+second terminal on 2026-11-16. `--include` prints the status line and the response headers
+before the body. The matching log lines printed by the server were:
+
+```text
+Server running at http://localhost:3000
+[2026-11-16T08:53:10.297Z] GET /api/courses
+[2026-11-16T08:53:10.311Z] GET /api/status
+[2026-11-16T08:53:10.319Z] POST /api/subscribe
+[2026-11-16T08:53:10.327Z] GET /api/admin
+[2026-11-16T08:53:10.335Z] GET /old-page
+[2026-11-16T08:53:10.343Z] GET /api/does-not-exist
+[2026-11-16T08:53:10.350Z] GET /no-such-page
+[2026-11-16T08:53:10.357Z] GET /robots.txt
+```
+
+### 1. Successful JSON response — `GET /api/courses`
+
+```http
+$ curl --include localhost:3000/api/courses
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 245
+ETag: W/"f5-dE4SdNhFBLaRLPyA149i9uvAY+U"
+Date: Mon, 16 Nov 2026 08:53:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+[{"id":1,"title":"Foundations of HTML and CSS","credits":5},{"id":2,"title":"JavaScript in the Browser","credits":6},{"id":3,"title":"Back-end Development with Node.js","credits":6},{"id":4,"title":"Web Accessibility and Usability","credits":4}]
+```
+
+Status `200 OK`, and `Content-Type: application/json` because the route uses `res.json`.
+
+### 2. Successful JSON response with live process values — `GET /api/status`
+
+```http
+$ curl --include localhost:3000/api/status
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 58
+ETag: W/"3a-Z7uKKy0MtZ3Xj5FdDFXav6kzuvw"
+Date: Mon, 16 Nov 2026 08:53:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"status":"ok","nodeVersion":"v24.15.0","uptimeSeconds":0}
+```
+
+`nodeVersion` comes from `process.version` and `uptimeSeconds` from `process.uptime()` (0 because the server had just started).
+
+### 3. The 201 response — `POST /api/subscribe`
+
+```http
+$ curl --include -X POST localhost:3000/api/subscribe
+HTTP/1.1 201 Created
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 19
+ETag: W/"13-oWAPIqDXuocNexKhPYW9ayyk98c"
+Date: Mon, 16 Nov 2026 08:53:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"subscribed":true}
+```
+
+`201 Created` instead of the default 200, set with `res.status(201)`.
+
+### 4. The 403 response — `GET /api/admin`
+
+```http
+$ curl --include localhost:3000/api/admin
+HTTP/1.1 403 Forbidden
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 21
+ETag: W/"15-TLNzmZqKxaTuFdX/dVWWPBu44/c"
+Date: Mon, 16 Nov 2026 08:53:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Forbidden"}
+```
+
+`403 Forbidden` with a JSON error body.
+
+### 5. The redirect — `GET /old-page`
+
+```http
+$ curl --include localhost:3000/old-page
+HTTP/1.1 302 Found
+X-Powered-By: Express
+Location: /hello
+Vary: Accept
+Content-Type: text/plain; charset=utf-8
+Content-Length: 28
+Date: Mon, 16 Nov 2026 08:53:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+Found. Redirecting to /hello
+```
+
+`302 Found` plus a `Location: /hello` header — that header is what makes the browser follow the redirect. (`curl -L` would follow it too.)
+
+### 6. 404 on an `/api` path — JSON body
+
+```http
+$ curl --include localhost:3000/api/does-not-exist
+HTTP/1.1 404 Not Found
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 21
+ETag: W/"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc"
+Date: Mon, 16 Nov 2026 08:53:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Not found"}
+```
+
+The fallback checks `req.path.startsWith('/api')` and answers with JSON, so API clients always get JSON.
+
+### 7. 404 on a non-API path — plain-text body
+
+```http
+$ curl --include localhost:3000/no-such-page
+HTTP/1.1 404 Not Found
+X-Powered-By: Express
+Content-Type: text/plain; charset=utf-8
+Content-Length: 45
+ETag: W/"2d-BszNuxRZ7xstVvm+UrjOLY23zN0"
+Date: Mon, 16 Nov 2026 08:53:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+404 – The page /no-such-page was not found.
+```
+
+Same fallback, but for normal pages it answers with a short human-readable text message.
+
+### 8. Plain-text file with the correct content type — `GET /robots.txt`
+
+```http
+$ curl --include localhost:3000/robots.txt
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: text/plain; charset=utf-8
+Content-Length: 102
+ETag: W/"66-AgAiANDfOIH/A3goopoDx4uJVes"
+Date: Mon, 16 Nov 2026 08:53:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+# robots.txt for the Northwind Web Engineering Programme server
+User-agent: *
+Disallow: /api/
+Allow: /
+```
+
+`res.type('text/plain')` sets `Content-Type: text/plain; charset=utf-8`.
