@@ -271,3 +271,97 @@ Allow: /
 ```
 
 `res.type('text/plain')` sets `Content-Type: text/plain; charset=utf-8`.
+
+## Reasoning questions
+
+### 1. Route order — experiment: 404 fallback moved to the top
+
+I copied `server.js`, moved the `app.use((req, res) => …)` fallback directly under
+`const app = express();` and requested `/`, `/hello`, `/api/courses`, `/api/stats` and `/styles.css`.
+**Every single request returned 404** — even the home page and the stylesheet — and the
+`/api/...` ones got the JSON `{"error":"Not found"}`. The server also printed *no log lines at
+all*, only `Server running at …`. Express runs middleware and routes strictly in the order they
+were registered, and `app.use()` without a path matches every request; because the fallback sends
+a response and never calls `next()`, nothing registered after it — not even the logger — is ever reached.
+
+### 2. Middleware — experiment: `next()` removed from the logger
+
+With `next()` commented out, the server still printed the log line (`[2026-11-16T08:51:26.945Z] GET /`),
+but nothing else happened. In the browser the tab just kept loading with an empty page and never
+showed anything; `curl --max-time 5` on `/hello` gave up after 5 seconds without a single
+byte of response (exit code 28 = timeout). The request was not rejected or crashed — it was simply
+stuck: the logger neither sent a response nor passed control on, so the counter, the static files
+and all routes were never reached and the connection stayed open waiting.
+
+### 3. Status codes
+
+`201 Created` tells the client that the request did not just succeed but **created something
+new** on the server (here: a subscription), which is exactly the meaning of a successful POST;
+`200 OK` would only say "it worked". A missing page must be a 404 because the status code is
+what programs read, not the text: browsers, `fetch` (`response.ok` is `false` only for 4xx/5xx),
+search engines and caches all decide what to do from the status line. A "200 with an error
+message" would make a search engine index the error page and make my own `app.js` treat the
+failure as a success.
+
+### 4. Configuration
+
+The port is part of the environment, not of the program. On my laptop 3000 may be free, but on a
+hosting platform the platform decides the port and passes it in `process.env.PORT`, and on a
+teammate's machine 3000 may already be taken by another project. Reading `process.env.PORT` with
+`3000` only as a fallback means the same code runs everywhere without editing it
+(`PORT=4123 node server.js` started the server on port 4123 without any change to `server.js`).
+
+### 5. Dependencies
+
+`node_modules/` can be recreated at any time from `package.json` + `package-lock.json`, it is
+very large (thousands of files for Express alone), and it can contain platform-specific files
+that would not work on another operating system — so it is listed in `.gitignore`. After
+cloning, a teammate must run **`npm install`** (or `npm ci` for an exact copy of the lock file)
+in the project folder, which downloads exactly the versions recorded in `package-lock.json`;
+then `npm start`.
+
+### 6. Same origin
+
+If `index.html` were opened directly from disk, its address would be `file:///…/index.html`.
+The relative URL `/api/courses` would then point to `file:///api/courses`, a file that does not
+exist, and browsers do not allow `fetch` to the `file:` scheme anyway — my page would show its
+"request failed" message. Even with a full URL like `http://localhost:3000/api/courses`, the page
+(origin `null`) and the API would be different origins, and the browser would block the page
+from reading the response unless the server sent CORS headers. This restriction is the
+**Same-Origin Policy**; serving the page and the API from the same server avoids it completely.
+
+I checked this with a small test page opened from disk in Chrome. Both fetches failed with
+`Failed to fetch`, and the console said *"Access to fetch at 'file:///api/courses' from origin
+'null' has been blocked by CORS policy"* and *"…'http://localhost:3000/api/courses' … No
+'Access-Control-Allow-Origin' header is present"*. Interestingly, my server log still showed
+`GET /api/courses` for the second one: the request **did reach the server** — it is the browser
+that refuses to hand the response to the page.
+
+## Self-study notes
+
+| Topic | What I found (source) | How I applied it |
+|---|---|---|
+| Node version and running time | The global `process` object has `process.version` (a string like `"v24.15.0"`) and `process.uptime()` (seconds since the process started, as a decimal number). — [Node.js docs: process](https://nodejs.org/api/process.html) | `/api/status` returns `process.version` and `Math.floor(process.uptime())`, so the values are real and change while the server runs. |
+| Sending a specific content type | `res.type(type)` sets the `Content-Type` header; `'text/plain'` becomes `text/plain; charset=utf-8`. `res.send` with a string would otherwise default to `text/html`. — [Express 5 API: res.type](https://expressjs.com/en/5x/api.html#res.type) | `/robots.txt`, `/hello` and the non-API 404 use `res.type('text/plain').send(...)`. The curl evidence shows the correct header. |
+| Displaying JSON neatly | `JSON.stringify(value, replacer, space)` — the third argument is the indentation. — [MDN: JSON.stringify](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify) | `app.js` reads the body with `response.text()`, tries `JSON.parse`, and shows `JSON.stringify(data, null, 2)` in a `<pre>`; if the body is not JSON it shows the raw text. |
+| Finding `public/` from any folder | In ES modules there is no `__dirname`; since Node 20.11 `import.meta.dirname` gives the folder of the current file. — [Node.js docs: import.meta.dirname](https://nodejs.org/api/esm.html#importmetadirname) | `path.join(import.meta.dirname, 'public')` is passed to `express.static`. I tested it by starting the server from `/`, and the page still loaded. |
+| Reading request headers | `req.get(name)` returns a header case-insensitively, or `undefined` if it is missing. — [Express 5 API: req.get](https://expressjs.com/en/5x/api.html#req.get) | `/api/headers` uses `req.get('User-Agent')` and `req.get('Accept')`, returning `null` when a header is absent. |
+| 404 in Express 5 | Express 5 uses a new path syntax and rejects the bare `*` wildcard. — [Migrating to Express 5](https://expressjs.com/en/guide/migrating-5.html) | The fallback is `app.use((req, res) => …)` with no path, registered last. |
+
+## Challenges I faced
+
+- **A broken Node.js installation.** The Homebrew `node` (v25, not an LTS release) failed to
+  start with `Library not loaded: libllhttp.9.3.dylib`. I found a second, working installation
+  of Node 24 LTS in `/usr/local/bin` and put it first in my `PATH`.
+- **Deciding what the counter should count.** At first I was not sure whether static files and
+  404s should count. I decided "requests served" means every request the server answered, and
+  placed the counter before `express.static` (see *Middleware* above).
+- **Testing without a browser.** My first test script sent the curl requests only one second
+  after starting the server; once the server started slower than that and all requests failed.
+  I changed the script to wait until the "Server running" message appeared.
+- **The `next()` experiment looks like a network problem.** With `next()` removed, nothing
+  errors — the request just hangs — so it is easy to blame the browser. The logger line in the
+  terminal was the clue that the request did reach the server and got stuck in the middleware.
+- **Keeping the browser page robust.** `fetch` does not throw for 403/404, only for network
+  errors, so I had to check `response.ok` for the error styling *and* use `try/catch` for the
+  case where the server is not running.
